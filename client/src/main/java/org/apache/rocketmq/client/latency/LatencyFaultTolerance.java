@@ -18,11 +18,16 @@
 package org.apache.rocketmq.client.latency;
 
 public interface LatencyFaultTolerance<T> {
+
+    //更新失败条目
     void updateFaultItem(final T name, final long currentLatency, final long notAvailableDuration);
 
+    //broker 是否可用
     boolean isAvailable(final T name);
 
+    //移除 broke
     void remove(final T name);
 
+    //选择一个可用的 broker
     T pickOneAtLeast();
 }

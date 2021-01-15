@@ -33,8 +33,11 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
         FaultItem old = this.faultItemTable.get(name);
         if (null == old) {
+            //第一次发送延迟故障时
             final FaultItem faultItem = new FaultItem(name);
+            //当前故障时间
             faultItem.setCurrentLatency(currentLatency);
+            //当前系统时间+不可用持续时间 ->   当前系统时间后的 xx秒后 ，允许故障在 xx 时间前
             faultItem.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
 
             old = this.faultItemTable.putIfAbsent(name, faultItem);
@@ -43,6 +46,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
                 old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
             }
         } else {
+            //非第一次设置故障时间
             old.setCurrentLatency(currentLatency);
             old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
         }
@@ -131,6 +135,11 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         public boolean isAvailable() {
+            // 判断Broker故障是否恢复了（Broker与 NameSrv会进行通讯服务，判断 broker 是否可用，来处理对应的 broker 信息列表）
+            // 比如说第一次发送时间点事 10：00：00，故障时间延迟到 10：00：00 +30s 为  10:00:30（这 30s 时间，nameSrv 通讯,判断broker 是否可用,同时维护 broker 列表信息）
+            // 如果再次使用该故障 broker，则判断是否可用时
+            // 此时为 10：00：20，则 10：00:20 < 10:00:30,则 broker 故障可能还没恢复，则 broker 不可用
+            // 此时为 10：00：35，则 10：00:35 > 10:00:30,则 broker 故障恢复，则 broker 可用
             return (System.currentTimeMillis() - startTimestamp) >= 0;
         }
 

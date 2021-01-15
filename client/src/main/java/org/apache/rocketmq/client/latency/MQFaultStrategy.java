@@ -56,6 +56,8 @@ public class MQFaultStrategy {
     }
 
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
+        //是否启动潜在因素故障检查，所谓潜在因素为 broker 是否断联
+        //默认不启用
         if (this.sendLatencyFaultEnable) {
             try {
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
@@ -64,6 +66,7 @@ public class MQFaultStrategy {
                     if (pos < 0)
                         pos = 0;
                     MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
+                    //判断 broker 是否故障，通过时间判断
                     if (latencyFaultTolerance.isAvailable(mq.getBrokerName())) {
                         if (null == lastBrokerName || mq.getBrokerName().equals(lastBrokerName))
                             return mq;
@@ -95,6 +98,13 @@ public class MQFaultStrategy {
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
         if (this.sendLatencyFaultEnable) {
             long duration = computeNotAvailableDuration(isolation ? 30000 : currentLatency);
+
+
+            /**
+             * brokerName  brokerName
+             * currentLatency 当前潜在因素时间 消息的发送结束时间-消息的开始发送时间
+             * duration  持续时间
+             */
             this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration);
         }
     }
