@@ -118,8 +118,11 @@ public class SubscriptionGroupManager extends ConfigManager {
     }
 
     public SubscriptionGroupConfig findSubscriptionGroupConfig(final String group) {
+        //根据组名获取订阅组信息
         SubscriptionGroupConfig subscriptionGroupConfig = this.subscriptionGroupTable.get(group);
         if (null == subscriptionGroupConfig) {
+            //是否是自动创建的订阅组或是否是系统的消费组
+            //如果是，则生成新的 broker组配置信息，同时group 的version 也改变
             if (brokerController.getBrokerConfig().isAutoCreateSubscriptionGroup() || MixAll.isSysConsumerGroup(group)) {
                 subscriptionGroupConfig = new SubscriptionGroupConfig();
                 subscriptionGroupConfig.setGroupName(group);
@@ -128,6 +131,7 @@ public class SubscriptionGroupManager extends ConfigManager {
                     log.info("auto create a subscription group, {}", subscriptionGroupConfig.toString());
                 }
                 this.dataVersion.nextVersion();
+                //存留 .....
                 this.persist();
             }
         }
