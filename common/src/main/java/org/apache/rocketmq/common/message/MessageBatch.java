@@ -31,6 +31,11 @@ public class MessageBatch extends Message implements Iterable<Message> {
         this.messages = messages;
     }
 
+    /**
+     * 批量消息编码
+     *
+     * @return
+     */
     public byte[] encode() {
         return MessageDecoder.encodeMessages(messages);
     }
@@ -39,30 +44,43 @@ public class MessageBatch extends Message implements Iterable<Message> {
         return messages.iterator();
     }
 
+    /**
+     * 生成批量消息对象
+     * 静态方法直接返回
+     *
+     * @param messages
+     * @return
+     */
     public static MessageBatch generateFromList(Collection<Message> messages) {
         assert messages != null;
         assert messages.size() > 0;
         List<Message> messageList = new ArrayList<Message>(messages.size());
         Message first = null;
         for (Message message : messages) {
+            //批量消息不支持延迟
             if (message.getDelayTimeLevel() > 0) {
                 throw new UnsupportedOperationException("TimeDelayLevel is not supported for batching");
             }
+            //批量消息不支持重试组
             if (message.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 throw new UnsupportedOperationException("Retry Group is not supported for batching");
             }
+            //第一个消息
             if (first == null) {
                 first = message;
             } else {
+                //topic 主题需要保持一致
                 if (!first.getTopic().equals(message.getTopic())) {
                     throw new UnsupportedOperationException("The topic of the messages in one batch should be the same");
                 }
+                //批量消息 等待存储消息应该一致
                 if (first.isWaitStoreMsgOK() != message.isWaitStoreMsgOK()) {
                     throw new UnsupportedOperationException("The waitStoreMsgOK of the messages in one batch should the same");
                 }
             }
             messageList.add(message);
         }
+        //返回处理好的批量消息
         MessageBatch messageBatch = new MessageBatch(messageList);
 
         messageBatch.setTopic(first.getTopic());

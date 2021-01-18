@@ -75,11 +75,13 @@ public class RemotingCommand {
     private int opaque = requestId.getAndIncrement();
     private int flag = 0;
     private String remark;
+    //扩展属性
     private HashMap<String, String> extFields;
+    //请求命令头信息
     private transient CommandCustomHeader customHeader;
 
     private SerializeType serializeTypeCurrentRPC = serializeTypeConfigInThisServer;
-
+    //请求内容
     private transient byte[] body;
 
     protected RemotingCommand() {
