@@ -48,6 +48,7 @@ public class MappedFileQueue {
 
     private volatile long storeTimestamp = 0;
 
+    //映射文件队列
     public MappedFileQueue(final String storePath, int mappedFileSize,
         AllocateMappedFileService allocateMappedFileService) {
         this.storePath = storePath;
@@ -237,6 +238,11 @@ public class MappedFileQueue {
         return getLastMappedFile(startOffset, true);
     }
 
+    /**
+     * 获取最后一个 Mapped 映射文件
+     *
+     * @return
+     */
     public MappedFile getLastMappedFile() {
         MappedFile mappedFileLast = null;
 

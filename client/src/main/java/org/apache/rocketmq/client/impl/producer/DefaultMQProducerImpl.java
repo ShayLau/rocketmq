@@ -655,7 +655,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 }
             }
 
-            if (sendResult != null) {
+                if (sendResult != null) {
                 return sendResult;
             }
 

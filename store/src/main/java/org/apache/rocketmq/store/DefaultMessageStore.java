@@ -225,7 +225,8 @@ public class DefaultMessageStore implements MessageStore {
      * @throws Exception
      */
     public void start() throws Exception {
-
+        //启动 消息存储
+        //随机访问文件
         lock = lockFile.getChannel().tryLock(0, 1, false);
         if (lock == null || lock.isShared() || !lock.isValid()) {
             throw new RuntimeException("Lock failed,MQ already started");
@@ -240,6 +241,13 @@ public class DefaultMessageStore implements MessageStore {
              * 3. Calculate the reput offset according to the consume queue;
              * 4. Make sure the fall-behind messages to be dispatched before starting the commitlog, especially when the broker role are automatically changed.
              */
+            /**
+             * 确保开始转发消息能够 被追踪 接受记录 在提交日志中的最大物理偏移量。
+             * Dledger 提交记录可能丢失，所以 最大物理逻辑，所以最大的逻辑队列可能最大的 是最大偏移量 返回 在DLedgerCommitLog.就让它去吧
+             * 手机在重发偏移量记录 在消费队列
+             * 在启动 commitLog之前，确保落在后面的消息被处理，特别的当 broker 的角色被自动改变
+             */
+
             long maxPhysicalPosInLogicQueue = commitLog.getMinOffset();
             for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
                 for (ConsumeQueue logic : maps.values()) {
@@ -260,6 +268,15 @@ public class DefaultMessageStore implements MessageStore {
                  *
                  * All the conditions has the same in common that the maxPhysicalPosInLogicQueue should be 0.
                  * If the maxPhysicalPosInLogicQueue is gt 0, there maybe something wrong.
+                 */
+                /**
+                 * 这个发生的条件
+                 * 如果 一些 消费队列被移除 或者磁盘被损坏
+                 * 运行一个 新的 broker和从其他broker 扶着了 commitlog
+                 *
+                 * 所有的条件定义在一些普通的他最大的屋里队列需要是 0
+                 * 如果最大的物理醉的队列大于0，它可能会会是错的
+                 *
                  */
                 log.warn("[TooSmallCqOffset] maxPhysicalPosInLogicQueue={} clMinOffset={}", maxPhysicalPosInLogicQueue, this.commitLog.getMinOffset());
             }
@@ -401,7 +418,7 @@ public class DefaultMessageStore implements MessageStore {
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         }
 
-        //broker 角色为从机时，每 5w 次检查状态打印一次 存储消息关闭
+        //broker 角色为从机时，每 5w 次检查状态打印一次：存储消息关闭
         if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
             long value = this.printTimes.getAndIncrement();
             if ((value % 50000) == 0) {
@@ -410,7 +427,7 @@ public class DefaultMessageStore implements MessageStore {
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         }
 
-        //运行状态不可写，每 5w 次检查状态打印一次 存储消息关闭
+        //运行状态不可写，每 5w 次检查状态打印一次：存储消息关闭
         if (!this.runningFlags.isWriteable()) {
             long value = this.printTimes.getAndIncrement();
             if ((value % 50000) == 0) {
@@ -1386,6 +1403,11 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 是否存在临时文件
+     *
+     * @return
+     */
     private boolean isTempFileExist() {
         String fileName = StorePathConfigHelper.getAbortFile(this.messageStoreConfig.getStorePathRootDir());
         File file = new File(fileName);

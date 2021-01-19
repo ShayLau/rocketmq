@@ -54,8 +54,16 @@ public class CommitLog {
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     // End of file empty MAGIC CODE cbd43194
     protected final static int BLANK_MAGIC_CODE = -875286124;
+
+    /**
+     * 映射文件队列
+     */
     protected final MappedFileQueue mappedFileQueue;
+    /**
+     *默认的消息存储
+     */
     protected final DefaultMessageStore defaultMessageStore;
+
     private final FlushCommitLogService flushCommitLogService;
 
     //If TransientStorePool enabled, we must flush message to FileChannel at fixed periods
@@ -70,26 +78,37 @@ public class CommitLog {
 
     protected final PutMessageLock putMessageLock;
 
+    /**
+     * 提交日志的构造方法
+     *
+     * @param defaultMessageStore
+     */
     public CommitLog(final DefaultMessageStore defaultMessageStore) {
         this.mappedFileQueue = new MappedFileQueue(defaultMessageStore.getMessageStoreConfig().getStorePathCommitLog(),
             defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog(), defaultMessageStore.getAllocateMappedFileService());
         this.defaultMessageStore = defaultMessageStore;
 
+        //同步刷盘
         if (FlushDiskType.SYNC_FLUSH == defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             this.flushCommitLogService = new GroupCommitService();
         } else {
+            //
             this.flushCommitLogService = new FlushRealTimeService();
         }
 
         this.commitLogService = new CommitRealTimeService();
 
+        //追加消息回调函数
         this.appendMessageCallback = new DefaultAppendMessageCallback(defaultMessageStore.getMessageStoreConfig().getMaxMessageSize());
+        //批量编码 本地线程
         batchEncoderThreadLocal = new ThreadLocal<MessageExtBatchEncoder>() {
             @Override
             protected MessageExtBatchEncoder initialValue() {
                 return new MessageExtBatchEncoder(defaultMessageStore.getMessageStoreConfig().getMaxMessageSize());
             }
         };
+
+        //指定消息放入时的 锁类型， 重入锁或者是旋转锁
         this.putMessageLock = defaultMessageStore.getMessageStoreConfig().isUseReentrantLockWhenPutMessage() ? new PutMessageReentrantLock() : new PutMessageSpinLock();
 
     }
@@ -791,9 +810,12 @@ public class CommitLog {
         // Back to Results
         AppendMessageResult result = null;
 
+        //存储状态服务
         StoreStatsService storeStatsService = this.defaultMessageStore.getStoreStatsService();
 
+        //主题名
         String topic = msg.getTopic();
+        //队列 id
         int queueId = msg.getQueueId();
 
         //事务类型
@@ -801,7 +823,13 @@ public class CommitLog {
         //
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
-            // Delay Delivery 延迟交付  延迟消息
+            // Delay Delivery 延迟交付 如果是  延迟消息
+            /**
+             * 如果是延迟消息
+             * 将消息放入到 延迟队列当中
+             * 根据延迟消息的时间级别，放入到SCHEDULE_TOPIC_XXXX的队列，队列 id 则为 level-1
+             *
+             */
             if (msg.getDelayTimeLevel() > 0) {
                 //校验延迟消息级别是否已经超过预设的最大值
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
@@ -809,26 +837,27 @@ public class CommitLog {
                 }
                 //延迟消息主题
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
-                //延迟消息队列
+                //延迟消息队列 根据时间级别，查找对应的延迟队列 id ，结果为 DelayTimeLevel-1
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 // Backup real topic, queueId
                 //备份真实的主题，消息队列 id
+                //在当前消息的属性 properties 中放入真实的 Topic名字和真实的队列 id
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
-
+                //消息设置为延迟队列中
                 msg.setTopic(topic);
                 msg.setQueueId(queueId);
             }
         }
-        //消息的出生地址
+        //消息的产生地址，判断消息的产生地址是否是 ipv6
         InetSocketAddress bornSocketAddress = (InetSocketAddress) msg.getBornHost();
         if (bornSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setBornHostV6Flag();
         }
 
-        //消息的存储地址
+        //消息的存储地址，判断消息的存储地址是否是 ipv6
         InetSocketAddress storeSocketAddress = (InetSocketAddress) msg.getStoreHost();
         if (storeSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setStoreHostAddressV6Flag();
@@ -836,7 +865,7 @@ public class CommitLog {
 
         long elapsedTimeInLock = 0;
 
-        //猥琐订的 mapped 文件
+        //未解锁的 mapped 文件
         MappedFile unlockMappedFile = null;
 
         //mapperFile
@@ -855,6 +884,7 @@ public class CommitLog {
 
             //mapperFile 如果是空的，则获取 mappedFileQueue 最后一个
             if (null == mappedFile || mappedFile.isFull()) {
+                //新的文件可能会引起噪音
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
             }
 
@@ -864,7 +894,7 @@ public class CommitLog {
                 beginTimeInLock = 0;
                 return new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null);
             }
-            //mapperFile 追加消息，
+            //mapperFile 追加消息
             result = mappedFile.appendMessage(msg, this.appendMessageCallback);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -1245,6 +1275,9 @@ public class CommitLog {
         return diff;
     }
 
+    /**
+     * 刷新 commitLog 服务类
+     */
     abstract class FlushCommitLogService extends ServiceThread {
         protected static final int RETRY_TIMES_OVER = 10;
     }
