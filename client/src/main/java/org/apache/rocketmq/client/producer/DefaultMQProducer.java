@@ -893,6 +893,16 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         return this.defaultMQProducerImpl.queryMessageByUniqKey(withNamespace(topic), msgId);
     }
 
+    /**
+     * 发送批量消息
+     *
+     * @param msgs
+     * @return
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     @Override
     public SendResult send(
         Collection<Message> msgs) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
@@ -942,8 +952,11 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         try {
             msgBatch = MessageBatch.generateFromList(msgs);
             for (Message message : msgBatch) {
+                //检查消息
                 Validators.checkMessage(message, this);
+                //设置唯一 id
                 MessageClientIDSetter.setUniqID(message);
+                //设置 topic
                 message.setTopic(withNamespace(message.getTopic()));
             }
             msgBatch.setBody(msgBatch.encode());
