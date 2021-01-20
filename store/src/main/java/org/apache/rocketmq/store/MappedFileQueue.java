@@ -467,9 +467,14 @@ public class MappedFileQueue {
      */
     public MappedFile findMappedFileByOffset(final long offset, final boolean returnFirstOnNotFound) {
         try {
+            //映射文件第一个映射文件
             MappedFile firstMappedFile = this.getFirstMappedFile();
+            //映射文件最后一个映射文件
             MappedFile lastMappedFile = this.getLastMappedFile();
+
+            //如果第一个文件和最后一个文件不为空，有可能是一个文件
             if (firstMappedFile != null && lastMappedFile != null) {
+                //偏移量小于第一个映射文件的偏移量 或者 偏移量大于最后一个文件的偏移量  不懂
                 if (offset < firstMappedFile.getFileFromOffset() || offset >= lastMappedFile.getFileFromOffset() + this.mappedFileSize) {
                     LOG_ERROR.warn("Offset not matched. Request offset: {}, firstOffset: {}, lastOffset: {}, mappedFileSize: {}, mappedFiles count: {}",
                         offset,
@@ -478,13 +483,15 @@ public class MappedFileQueue {
                         this.mappedFileSize,
                         this.mappedFiles.size());
                 } else {
+                    //假如没有删除过 mapped 文件 ，offset/文件大小， 1025/1024 =1   第一个文件的偏移量 1024/1024 =0  1-0 =1
+                    //
                     int index = (int) ((offset / this.mappedFileSize) - (firstMappedFile.getFileFromOffset() / this.mappedFileSize));
                     MappedFile targetFile = null;
                     try {
                         targetFile = this.mappedFiles.get(index);
                     } catch (Exception ignored) {
                     }
-
+                    //如果目标文件不是空，并且offset>=目标文件偏移量,并且 offset< 目标文件偏移量+文件大小
                     if (targetFile != null && offset >= targetFile.getFileFromOffset()
                         && offset < targetFile.getFileFromOffset() + this.mappedFileSize) {
                         return targetFile;

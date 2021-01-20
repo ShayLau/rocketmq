@@ -70,6 +70,14 @@ public class MappedFile extends ReferenceResource {
     public MappedFile() {
     }
 
+    /**
+     * 在构造 commitLog::load()方法，会构造 MappedFileQueue 在遍历 store 目录时，会遍历 sotre 目录下的文件，
+     * store 中的每一个文件都会调用mappedFile 的 init方法（该方法）
+     *
+     * @param fileName
+     * @param fileSize
+     * @throws IOException
+     */
     public MappedFile(final String fileName, final int fileSize) throws IOException {
         init(fileName, fileSize);
     }
@@ -146,23 +154,39 @@ public class MappedFile extends ReferenceResource {
     public void init(final String fileName, final int fileSize,
                      final TransientStorePool transientStorePool) throws IOException {
         init(fileName, fileSize);
+        //瞬时存储池transientStorePool取一个 buffer
         this.writeBuffer = transientStorePool.borrowBuffer();
         this.transientStorePool = transientStorePool;
     }
 
+    /**
+     * mappedFile 文件初始化
+     *
+     * @param fileName
+     * @param fileSize
+     * @throws IOException
+     */
     private void init(final String fileName, final int fileSize) throws IOException {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.file = new File(fileName);
+        //根据名字获取偏移量
         this.fileFromOffset = Long.parseLong(this.file.getName());
         boolean ok = false;
-
+        //确保存储路径存在
         ensureDirOK(this.file.getParent());
 
         try {
+            //当前文件通道
             this.fileChannel = new RandomAccessFile(this.file, "rw").getChannel();
+
+            /**
+             * 将文件内容直接灌到JVM堆外的虚拟内存
+             */
             this.mappedByteBuffer = this.fileChannel.map(MapMode.READ_WRITE, 0, fileSize);
+            //文件的虚拟内存大小
             TOTAL_MAPPED_VIRTUAL_MEMORY.addAndGet(fileSize);
+            //文件的数量大小
             TOTAL_MAPPED_FILES.incrementAndGet();
             ok = true;
         } catch (FileNotFoundException e) {
@@ -216,20 +240,28 @@ public class MappedFile extends ReferenceResource {
         assert messageExt != null;
         assert cb != null;
 
-        //当前存储定位
+        //原mappedFile写入的位置，作为当前写入位置的开始，第一次追加应该是0
         int currentPos = this.wrotePosition.get();
         //判断当前存储定位是否超过了文件的大小
         if (currentPos < this.fileSize) {
-
-            // byteBuffer 处理
-            // 判断写入 buffer 是否为空，如果不是空从 write 切分，否则在 mappedBuffer 切分
+            /**
+             * byteBuffer 获取 ，如果writeBuffer 不是空从 如果writeBuffer切分，否则在 mappedBuffer 切分
+             */
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
+            //设置当前位置
             byteBuffer.position(currentPos);
             AppendMessageResult result;
             //追加消息
             if (messageExt instanceof MessageExtBrokerInner) {
+                /**
+                 * getFileFromOffset 根据文件名获取的偏移量
+                 * byteBuffer 写入的 bytebuffer
+                 * maxBlank  mappedFile 的最大空白区
+                 * messageExt 消息内容
+                 */
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBrokerInner) messageExt);
             } else if (messageExt instanceof MessageExtBatch) {
+                //
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBatch) messageExt);
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
@@ -317,6 +349,7 @@ public class MappedFile extends ReferenceResource {
 
     public int commit(final int commitLeastPages) {
         if (writeBuffer == null) {
+            //不需要提交数据到文件通道，所以将wrotePosition作为committedPosition
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
             return this.wrotePosition.get();
         }
