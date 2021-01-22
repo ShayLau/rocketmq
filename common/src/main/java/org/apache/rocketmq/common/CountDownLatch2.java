@@ -123,6 +123,9 @@ public class CountDownLatch2 {
      * thread scheduling purposes.
      *
      * <p>If the current count equals zero then nothing happens.
+     * 减少锁存器的计数，如果计数达到零，则释放所有等待线程。
+     * 如果当前计数大于零，则将其递减。 如果新计数为零，则将重新启用所有等待线程以进行线程调度。
+     * 如果当前计数等于零，那么什么也不会发生
      */
     public void countDown() {
         sync.releaseShared(1);

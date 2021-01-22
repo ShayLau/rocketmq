@@ -121,7 +121,9 @@ public abstract class ServiceThread implements Runnable {
     }
 
     public void wakeup() {
+        //是否有消息通知，唤醒的时候将该值改为有消息通知
         if (hasNotified.compareAndSet(false, true)) {
+
             waitPoint.countDown(); // notify
         }
     }

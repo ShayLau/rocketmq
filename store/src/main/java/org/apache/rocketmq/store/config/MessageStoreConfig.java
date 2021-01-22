@@ -298,6 +298,14 @@ public class MessageStoreConfig {
         this.deleteWhen = deleteWhen;
     }
 
+    /**
+     * 获取最大使用比率
+     * 小于 10 使用 10
+     * 大于 95 则为 95
+     * 其他直接返回比率
+     *
+     * @return
+     */
     public int getDiskMaxUsedSpaceRatio() {
         if (this.diskMaxUsedSpaceRatio < 10)
             return 10;

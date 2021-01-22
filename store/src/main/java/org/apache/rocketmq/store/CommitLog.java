@@ -67,6 +67,7 @@ public class CommitLog {
     private final FlushCommitLogService flushCommitLogService;
 
     //If TransientStorePool enabled, we must flush message to FileChannel at fixed periods
+    //瞬时存储线程池如果开启的话，我们必须刷盘消息到文件通道
     private final FlushCommitLogService commitLogService;
 
     private final AppendMessageCallback appendMessageCallback;
@@ -157,6 +158,15 @@ public class CommitLog {
         return this.mappedFileQueue.remainHowManyDataToFlush();
     }
 
+    /**
+     * 删除过期文件
+     *
+     * @param expiredTime 失效时间
+     * @param deleteFilesInterval 删除时间间隔
+     * @param intervalForcibly 强制删除时间间隔
+     * @param cleanImmediately 强制删除
+     * @return
+     */
     public int deleteExpiredFile(
         final long expiredTime,
         final int deleteFilesInterval,
@@ -217,9 +227,9 @@ public class CommitLog {
             //当前文件已校验通过的 offset
             long processOffset = mappedFile.getFileFromOffset();
             //commitLog文件已确认的物理偏移量等于 mappedFile.getFileFormOffset 加上mappedFileOffset
+            //commitLog文件已确认的物理偏移量
             long mappedFileOffset = 0;
             while (true) {
-
                 DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover);
                 //消息的长度
                 int size = dispatchRequest.getMsgSize();
@@ -1056,10 +1066,8 @@ public class CommitLog {
      */
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
 
-        /**
-         * 同步刷盘
-         */
-        // Synchronization flush
+
+        // Synchronization flush 同步刷盘
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             //等待消息存储 ok
@@ -1070,11 +1078,14 @@ public class CommitLog {
                 CompletableFuture<PutMessageStatus> flushOkFuture = request.future();
                 PutMessageStatus flushStatus = null;
                 try {
+                    //同步刷盘超时时间为 5s
+                    //等待 5s 中返回请求返回的结果
                     flushStatus = flushOkFuture.get(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout(),
                             TimeUnit.MILLISECONDS);
                 } catch (InterruptedException | ExecutionException | TimeoutException e) {
                     //flushOK=false;
                 }
+                //是否超时
                 if (flushStatus != PutMessageStatus.PUT_OK) {
                     log.error("do groupcommit, wait for flush failed, topic: " + messageExt.getTopic() + " tags: " + messageExt.getTags()
                         + " client address: " + messageExt.getBornHostString());
@@ -1084,10 +1095,7 @@ public class CommitLog {
                 service.wakeup();
             }
         }
-        /**
-         * 异步刷盘
-         */
-        // Asynchronous flush
+        // Asynchronous flush 异步刷盘
         else {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                 flushCommitLogService.wakeup();
@@ -1517,6 +1525,7 @@ public class CommitLog {
     }
 
     public static class GroupCommitRequest {
+        //刷盘点偏移量
         private final long nextOffset;
         private CompletableFuture<PutMessageStatus> flushOKFuture = new CompletableFuture<>();
         private final long startTimestamp = System.currentTimeMillis();
@@ -1560,6 +1569,9 @@ public class CommitLog {
             this.wakeup();
         }
 
+        /**
+         * 交换请求
+         */
         private void swapRequests() {
             List<GroupCommitRequest> tmp = this.requestsWrite;
             this.requestsWrite = this.requestsRead;

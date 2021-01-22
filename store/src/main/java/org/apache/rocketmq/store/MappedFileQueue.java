@@ -356,6 +356,14 @@ public class MappedFileQueue {
         }
     }
 
+    /**
+     * 根据时间删除 过期文件
+     * @param expiredTime
+     * @param deleteFilesInterval
+     * @param intervalForcibly
+     * @param cleanImmediately
+     * @return
+     */
     public int deleteExpiredFileByTime(final long expiredTime,
         final int deleteFilesInterval,
         final long intervalForcibly,

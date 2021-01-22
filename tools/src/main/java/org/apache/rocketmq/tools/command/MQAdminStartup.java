@@ -83,9 +83,10 @@ import org.slf4j.LoggerFactory;
 public class MQAdminStartup {
     protected static List<SubCommand> subCommandList = new ArrayList<SubCommand>();
 
-    private static String rocketmqHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY,
-        System.getenv(MixAll.ROCKETMQ_HOME_ENV));
+//    private static String rocketmqHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY,
+//        System.getenv(MixAll.ROCKETMQ_HOME_ENV));
 
+    private static String rocketmqHome="/Users/mrxu/develop/software/rocketmq-4.7.1";
     public static void main(String[] args) {
         main0(args, null);
     }
