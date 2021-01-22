@@ -18,12 +18,10 @@ package org.apache.rocketmq.store;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
@@ -49,7 +47,7 @@ public class MappedFileQueue {
     private volatile long storeTimestamp = 0;
 
     //映射文件队列
-    public MappedFileQueue(final String storePath, int mappedFileSize,
+    public  MappedFileQueue(final String storePath, int mappedFileSize,
         AllocateMappedFileService allocateMappedFileService) {
         this.storePath = storePath;
         this.mappedFileSize = mappedFileSize;
@@ -87,6 +85,19 @@ public class MappedFileQueue {
                 return mappedFile;
             }
         }
+/*        *//**
+         * 根据时间点获取最后一个mappedFiled文件
+         *//*
+        if(Objects.nonNull(mfs)){
+            AtomicReference<MappedFile> mappedFile=null;
+            Arrays.asList(mfs).stream().map(obj->(MappedFile)obj).forEach(file -> {
+                if(file.getLastModifiedTimestamp()>=timestamp){
+                    mappedFile.set(file);
+                    return ;
+                }
+            });
+            return mappedFile.get();
+        }*/
 
         return (MappedFile) mfs[mfs.length - 1];
     }
@@ -102,11 +113,17 @@ public class MappedFileQueue {
         return mfs;
     }
 
+    /**
+     * 截断目录文件
+     * @param offset
+     */
     public void truncateDirtyFiles(long offset) {
         List<MappedFile> willRemoveFiles = new ArrayList<MappedFile>();
-
+        //所有的 mapped 文件
         for (MappedFile file : this.mappedFiles) {
+            //文件总计偏移量=文件偏移量+文件大小
             long fileTailOffset = file.getFileFromOffset() + this.mappedFileSize;
+            //如果文件总计偏移量>给定参数的偏移量
             if (fileTailOffset > offset) {
                 if (offset >= file.getFileFromOffset()) {
                     file.setWrotePosition((int) (offset % this.mappedFileSize));

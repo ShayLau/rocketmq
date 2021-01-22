@@ -168,13 +168,23 @@ public class CommitLog {
 
     /**
      * Read CommitLog data, use data replication
+     * 读取 ComimtLog 数据，使用数据复制
      */
     public SelectMappedBufferResult getData(final long offset) {
         return this.getData(offset, offset == 0);
     }
 
+    /**
+     *
+     * @param offset
+     * @param returnFirstOnNotFound
+     * @return
+     */
     public SelectMappedBufferResult getData(final long offset, final boolean returnFirstOnNotFound) {
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog();
+        /**
+         * 根据偏移量找到要复制消息的 mappedFile
+         */
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, returnFirstOnNotFound);
         if (mappedFile != null) {
             int pos = (int) (offset % mappedFileSize);
@@ -187,9 +197,14 @@ public class CommitLog {
 
     /**
      * When the normal exit, data recovery, all memory data have been flush
+     * 当正常退出，数据恢复，所有的的内存数据刷盘
      */
     public void recoverNormally(long maxPhyOffsetOfConsumeQueue) {
+        /**
+         * 检查 CRC 恢复
+         */
         boolean checkCRCOnRecover = this.defaultMessageStore.getMessageStoreConfig().isCheckCRCOnRecover();
+
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
             // Began to recover from the last third file
@@ -199,11 +214,16 @@ public class CommitLog {
 
             MappedFile mappedFile = mappedFiles.get(index);
             ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
+            //当前文件已校验通过的 offset
             long processOffset = mappedFile.getFileFromOffset();
+            //commitLog文件已确认的物理偏移量等于 mappedFile.getFileFormOffset 加上mappedFileOffset
             long mappedFileOffset = 0;
             while (true) {
+
                 DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover);
+                //消息的长度
                 int size = dispatchRequest.getMsgSize();
+                //正常数据，正常数据会增加到mappedFileOffset
                 // Normal data
                 if (dispatchRequest.isSuccess() && size > 0) {
                     mappedFileOffset += size;
@@ -211,6 +231,7 @@ public class CommitLog {
                 // Come the end of the file, switch to the next file Since the
                 // return 0 representatives met last hole,
                 // this can not be included in truncate offset
+                //如果消息的长度是 0，index 递增，则mapper 为下一个文件，开始校验下一个文件
                 else if (dispatchRequest.isSuccess() && size == 0) {
                     index++;
                     if (index >= mappedFiles.size()) {
@@ -232,21 +253,28 @@ public class CommitLog {
                 }
             }
 
+            //所有文件处理完之后，
+
             processOffset += mappedFileOffset;
+
             this.mappedFileQueue.setFlushedWhere(processOffset);
             this.mappedFileQueue.setCommittedWhere(processOffset);
+            //截断目录文件
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
+            //清除消费队列中多余的数据
             // Clear ConsumeQueue redundant data
             if (maxPhyOffsetOfConsumeQueue >= processOffset) {
                 log.warn("maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, processOffset);
                 this.defaultMessageStore.truncateDirtyLogicFiles(processOffset);
             }
         } else {
+            //
             // Commitlog case files are deleted
             log.warn("The commitlog files are deleted, and delete the consume queue files");
             this.mappedFileQueue.setFlushedWhere(0);
             this.mappedFileQueue.setCommittedWhere(0);
+
             this.defaultMessageStore.destroyLogics();
         }
     }
@@ -1235,12 +1263,19 @@ public class CommitLog {
         return -1;
     }
 
+    /**
+     * Commitlog 的最小偏移量
+     * @return
+     */
     public long getMinOffset() {
+        //第一个mapped File
         MappedFile mappedFile = this.mappedFileQueue.getFirstMappedFile();
         if (mappedFile != null) {
             if (mappedFile.isAvailable()) {
+                //文章偏移量(文件名确定文件偏移量)
                 return mappedFile.getFileFromOffset();
             } else {
+                //如果文章不可用，翻滚到下一个文件，参数 应该是默认的 1G
                 return this.rollNextFile(mappedFile.getFileFromOffset());
             }
         }
@@ -1268,8 +1303,17 @@ public class CommitLog {
         return null;
     }
 
+    /**
+     * 翻滚到下一个文件
+     *
+     * @param offset
+     * @return
+     */
     public long rollNextFile(final long offset) {
+        //默认的 mappedFile文件大小 1G
         int mappedFileSize = this.defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog();
+        //比如说 第一个Commit文件的大小1G+默认的 CommitLog文件的大小 1G  =2G，  offset%1G 的大小 ，则返回 第二个文件-偏移量 =第二个文件剩余的空间
+        //第一个文件的偏移量+默认文件大小- （第一个文件偏移量和默认文件大小的取模=0）
         return offset + mappedFileSize - offset % mappedFileSize;
     }
 

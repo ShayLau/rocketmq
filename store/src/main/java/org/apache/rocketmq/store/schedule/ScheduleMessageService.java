@@ -160,6 +160,10 @@ public class ScheduleMessageService extends ConfigManager {
         return this.encode(false);
     }
 
+    /**
+     * 加载延迟队列，暂未解析
+     * @return
+     */
     public boolean load() {
         boolean result = super.load();
         result = result && this.parseDelayLevel();
@@ -189,6 +193,10 @@ public class ScheduleMessageService extends ConfigManager {
         return delayOffsetSerializeWrapper.toJson(prettyFormat);
     }
 
+    /**
+     * 解析延迟级别
+     * @return
+     */
     public boolean parseDelayLevel() {
         HashMap<String, Long> timeUnitTable = new HashMap<String, Long>();
         timeUnitTable.put("s", 1000L);

@@ -158,7 +158,7 @@ public class DefaultMessageStore implements MessageStore {
 
         this.allocateMappedFileService.start();
 
-        this.indexService.start();
+         this.indexService.start();
 
         this.dispatcherList = new LinkedList<>();
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
@@ -202,9 +202,10 @@ public class DefaultMessageStore implements MessageStore {
             if (result) {
                 this.storeCheckpoint =
                         new StoreCheckpoint(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
-
+                //加载索引
                 this.indexService.load(lastExitOK);
 
+                //恢复，根据 abort 文件是否存在，来决定怎么加载
                 this.recover(lastExitOK);
 
                 log.info("load over, and the max phy offset = {}", this.getMaxPhyOffset());
@@ -243,10 +244,14 @@ public class DefaultMessageStore implements MessageStore {
              */
             /**
              * 确保开始转发消息能够 被追踪 接受记录 在提交日志中的最大物理偏移量。
-             * Dledger 提交记录可能丢失，所以 最大物理逻辑，所以最大的逻辑队列可能最大的 是最大偏移量 返回 在DLedgerCommitLog.就让它去吧
+             * Dledger 提交记录可能丢失，所以最大的逻辑队列可能最大的 是最大偏移量 返回 在DLedgerCommitLog.就让它去吧
              * 手机在重发偏移量记录 在消费队列
              * 在启动 commitLog之前，确保落在后面的消息被处理，特别的当 broker 的角色被自动改变
              */
+            //确保在恢复期间根据commitlog的最大物理偏移量截断快进消息
+            //DLedger committedPos可能丢失，所以maxPhysicalPosInLogicQueue可能比DLedger commitlog返回的maxOffset更大，就让它去吧
+            //根据消费队列计算输出偏移量
+            //在启动commitlog之前，确保分派滞后消息，特别是在代理角色被自动更改时。
 
             long maxPhysicalPosInLogicQueue = commitLog.getMinOffset();
             for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
@@ -282,7 +287,9 @@ public class DefaultMessageStore implements MessageStore {
             }
             log.info("[SetReputOffset] maxPhysicalPosInLogicQueue={} clMinOffset={} clMaxOffset={} clConfirmedOffset={}",
                     maxPhysicalPosInLogicQueue, this.commitLog.getMinOffset(), this.commitLog.getMaxOffset(), this.commitLog.getConfirmOffset());
+            //设置发送消息的起始点
             this.reputMessageService.setReputFromOffset(maxPhysicalPosInLogicQueue);
+            //启动分发消息的线程
             this.reputMessageService.start();
 
             /**
@@ -1482,6 +1489,11 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 恢复消费队列
+     *
+     * @return
+     */
     private long recoverConsumeQueue() {
         long maxPhysicOffset = -1;
         for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
@@ -1548,6 +1560,11 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 信息放到消费队列
+     *
+     * @param dispatchRequest
+     */
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
         cq.putMessagePositionInfoWrapper(dispatchRequest);
@@ -1602,6 +1619,9 @@ public class DefaultMessageStore implements MessageStore {
         }, 6, TimeUnit.SECONDS);
     }
 
+    /**
+     * 处理消费队列的
+     */
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 
         @Override
@@ -1619,6 +1639,9 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 处理 index 的
+     */
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
         @Override
@@ -1973,18 +1996,25 @@ public class DefaultMessageStore implements MessageStore {
                     break;
                 }
 
+                /**
+                 * 根据偏移量，确定消息在 commitlog 的那个部分，将信息都封装到SelectMappedBufferResult
+                 */
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
+                        //偏移量开始的位置
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            //检查消息并且返回消息长度
                             DispatchRequest dispatchRequest =
                                     DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
+                            //检查是否成功
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
@@ -1994,7 +2024,7 @@ public class DefaultMessageStore implements MessageStore {
                                                 dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),
                                                 dispatchRequest.getBitMap(), dispatchRequest.getPropertiesMap());
                                     }
-
+                                    //设置 reput 的新位置
                                     this.reputFromOffset += size;
                                     readSize += size;
                                     if (DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE) {

@@ -87,6 +87,10 @@ public class ConsumeQueue {
         return result;
     }
 
+    /***
+     * 消费队列的恢复
+     *
+     */
     public void recover() {
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
@@ -154,7 +158,14 @@ public class ConsumeQueue {
         }
     }
 
+    /**
+     * 根据时间获取队列中偏移量
+     *
+     * @param timestamp
+     * @return
+     */
     public long getOffsetInQueueByTime(final long timestamp) {
+        //根据文件的最后修改时间找到的
         MappedFile mappedFile = this.mappedFileQueue.getMappedFileByTime(timestamp);
         if (mappedFile != null) {
             long offset = 0;
@@ -492,8 +503,11 @@ public class ConsumeQueue {
 
     public SelectMappedBufferResult getIndexBuffer(final long startIndex) {
         int mappedFileSize = this.mappedFileSize;
+        //消费队列里面的每个消息固定使用 20 个字节，所以知道开始的位置就可以根据 index*20，消费队列中的消息偏移量
         long offset = startIndex * CQ_STORE_UNIT_SIZE;
+
         if (offset >= this.getMinLogicOffset()) {
+
             MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset);
             if (mappedFile != null) {
                 SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize));

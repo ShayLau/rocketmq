@@ -321,12 +321,20 @@ public class MappedFile extends ReferenceResource {
     /**
      * @return The current flushed position
      */
+    /**
+     * 冲刷
+     * @param flushLeastPages 冲刷页
+     * @return
+     */
     public int flush(final int flushLeastPages) {
+        //是否能够冲刷
         if (this.isAbleToFlush(flushLeastPages)) {
             if (this.hold()) {
+                //获取最大可读指针
                 int value = getReadPosition();
 
                 try {
+                    //只会冲刷到一种里面
                     //We only append data to fileChannel or mappedByteBuffer, never both.
                     if (writeBuffer != null || this.fileChannel.position() != 0) {
                         this.fileChannel.force(false);
@@ -348,11 +356,14 @@ public class MappedFile extends ReferenceResource {
     }
 
     public int commit(final int commitLeastPages) {
+
+        //使用的堆外内存模式
         if (writeBuffer == null) {
             //不需要提交数据到文件通道，所以将wrotePosition作为committedPosition
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
             return this.wrotePosition.get();
         }
+        //判断提交的最后也，是否可以提交
         if (this.isAbleToCommit(commitLeastPages)) {
             if (this.hold()) {
                 commit0(commitLeastPages);
@@ -405,14 +416,18 @@ public class MappedFile extends ReferenceResource {
     }
 
     protected boolean isAbleToCommit(final int commitLeastPages) {
+
         int flush = this.committedPosition.get();
+        //写的位置
         int write = this.wrotePosition.get();
 
+        //如果满了
         if (this.isFull()) {
             return true;
         }
 
         if (commitLeastPages > 0) {
+            //写指针-提交指针
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= commitLeastPages;
         }
 
