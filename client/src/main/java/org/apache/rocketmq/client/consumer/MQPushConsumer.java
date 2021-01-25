@@ -27,26 +27,37 @@ import org.apache.rocketmq.client.exception.MQClientException;
 public interface MQPushConsumer extends MQConsumer {
     /**
      * Start the consumer
+     * 启动消费
      */
     void start() throws MQClientException;
 
     /**
      * Shutdown the consumer
+     * 关闭消费
      */
     void shutdown();
 
     /**
      * Register the message listener
+     * 注册消息监听器
      */
     @Deprecated
     void registerMessageListener(MessageListener messageListener);
 
+    /**
+     * 注册并发消息监听器
+     * @param messageListener
+     */
     void registerMessageListener(final MessageListenerConcurrently messageListener);
-
+    /**
+     * 注册顺序消息监听器
+     * @param messageListener
+     */
     void registerMessageListener(final MessageListenerOrderly messageListener);
 
     /**
      * Subscribe some topic
+     * 订阅主题
      *
      * @param subExpression subscription expression.it only support or operation such as "tag1 || tag2 || tag3" <br> if
      * null or * expression,meaning subscribe
@@ -57,10 +68,10 @@ public interface MQPushConsumer extends MQConsumer {
     /**
      * This method will be removed in the version 5.0.0,because filterServer was removed,and method <code>subscribe(final String topic, final MessageSelector messageSelector)</code>
      * is recommended.
-     *
+     * 订阅主题 将会被移除，不推荐使用
      * Subscribe some topic
      *
-     * @param fullClassName full class name,must extend org.apache.rocketmq.common.filter. MessageFilter
+     * @param fullClassName full class name,must extend org.apache.rocketmq.common.filter. MessageFilter 全类名
      * @param filterClassSource class source code,used UTF-8 file encoding,must be responsible for your code safety
      */
     @Deprecated
@@ -69,6 +80,7 @@ public interface MQPushConsumer extends MQConsumer {
 
     /**
      * Subscribe some topic with selector.
+     * 订阅一些主题和选择器
      * <p>
      * This interface also has the ability of {@link #subscribe(String, String)},
      * and, support other message selection, such as {@link org.apache.rocketmq.common.filter.ExpressionType#SQL92}.
@@ -88,6 +100,7 @@ public interface MQPushConsumer extends MQConsumer {
 
     /**
      * Unsubscribe consumption some topic
+     *  消息订阅一些主题
      *
      * @param topic message topic
      */
@@ -95,16 +108,19 @@ public interface MQPushConsumer extends MQConsumer {
 
     /**
      * Update the consumer thread pool size Dynamically
+     *
      */
     void updateCorePoolSize(int corePoolSize);
 
     /**
      * Suspend the consumption
+     * 延迟消费
      */
     void suspend();
 
     /**
      * Resume the consumption
+     * 暂停消费
      */
     void resume();
 }

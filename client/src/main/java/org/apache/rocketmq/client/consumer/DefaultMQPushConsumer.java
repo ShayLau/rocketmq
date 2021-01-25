@@ -80,14 +80,16 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Message model defines the way how messages are delivered to each consumer clients.
+     * 消息模式定义如果将消息交付到没有个消费者客户端
      * </p>
      *
+     * 集群模式，会使相同的消费组的消费者能够做到消费分片，从而实现负载均衡，而如果是广播模式，没有一个消费客户端都会受到消息
      * RocketMQ supports two message models: clustering and broadcasting. If clustering is set, consumer clients with
      * the same {@link #consumerGroup} would only consume shards of the messages subscribed, which achieves load
      * balances; Conversely, if the broadcasting is set, each consumer client will consume all subscribed messages
      * separately.
      * </p>
-     *
+        *
      * This field defaults to clustering.
      */
     private MessageModel messageModel = MessageModel.CLUSTERING;
@@ -122,6 +124,16 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * messages born prior to {@link #consumeTimestamp} will be ignored
      * </li>
      * </ul>
+     * 消费者启动时的消耗点。
+     *
+     * 有三个消耗点：
+     * CONSUME_FROM_LAST_OFFSET ：消费者客户端在其先前停止的位置接机。
+     *                              如果这是新启动的客户客户端，则根据客户组的老化情况，有两种情况：
+     *                              如果消费者组是最近创建的，以至于最早的订阅消息尚未到期，这意味着该消费者组代表着最近启动的业务，那么消费将从一开始就开始；
+     *                              如果最早的已订阅消息已过期，则消费将从最新消息开始，这意味着在启动时间戳之前出生的消息将被忽略。
+     *
+     * CONSUME_FROM_FIRST_OFFSET ：消费者客户端将从最早的可用消息开始。
+     * CONSUME_FROM_TIMESTAMP ：消费者客户端将从指定的时间戳开始，这意味着在消费时间戳之前产生的consumeTimestamp将被忽略
      */
     private ConsumeFromWhere consumeFromWhere = ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET;
 
@@ -135,47 +147,58 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Queue allocation algorithm specifying how message queues are allocated to each consumer clients.
+     *
+     * 队列分配算法，指定如何将消息队列分配给每个消费客户端
      */
     private AllocateMessageQueueStrategy allocateMessageQueueStrategy;
 
     /**
      * Subscription relationship
+     * 订阅关系
      */
     private Map<String /* topic */, String /* sub expression */> subscription = new HashMap<String, String>();
 
     /**
      * Message listener
+     * 消息监听器
      */
     private MessageListener messageListener;
 
     /**
      * Offset Storage
+     * 偏移存储
      */
     private OffsetStore offsetStore;
 
     /**
      * Minimum consumer thread number
+     * 最小消费线程数
      */
     private int consumeThreadMin = 20;
 
     /**
      * Max consumer thread number
+     * 最大消费线程数
      */
     private int consumeThreadMax = 20;
 
     /**
      * Threshold for dynamic adjustment of the number of thread pool
+     * 线程池数量调整动态门槛
      */
     private long adjustThreadPoolNumsThreshold = 100000;
 
     /**
      * Concurrently max span offset.it has no effect on sequential consumption
+     *
      */
     private int consumeConcurrentlyMaxSpan = 2000;
 
     /**
      * Flow control threshold on queue level, each message queue will cache at most 1000 messages by default,
      * Consider the {@code pullBatchSize}, the instantaneous value may exceed the limit
+     * 允许控制门槛在队列级别，每个消息队列默认将会缓存操作 1K 个消息
+     * 考虑到批量拉的大小，瞬间值将会到达极限
      */
     private int pullThresholdForQueue = 1000;
 
@@ -212,11 +235,13 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Message pull Interval
+     * 消息拉间隔
      */
     private long pullInterval = 0;
 
     /**
      * Batch consumption size
+     * 批量消费大小
      */
     private int consumeMessageBatchMaxSize = 1;
 
@@ -232,6 +257,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Whether the unit of subscription group
+     * 订阅组单元
      */
     private boolean unitMode = false;
 
@@ -266,6 +292,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Default constructor.
+     * 默认构造器
      */
     public DefaultMQPushConsumer() {
         this(null, MixAll.DEFAULT_CONSUMER_GROUP, null, new AllocateMessageQueueAveragely());
