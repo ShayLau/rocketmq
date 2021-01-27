@@ -76,9 +76,16 @@ public class PullMessageService extends ServiceThread {
         return scheduledExecutorService;
     }
 
+
+    /**
+     * 根据请求拉消息
+     *
+     * @param pullRequest
+     */
     private void pullMessage(final PullRequest pullRequest) {
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {
+            //实例化实现类，消息推消息实现
             DefaultMQPushConsumerImpl impl = (DefaultMQPushConsumerImpl) consumer;
             impl.pullMessage(pullRequest);
         } else {
@@ -86,6 +93,13 @@ public class PullMessageService extends ServiceThread {
         }
     }
 
+    /**
+     * 拉取线程服务
+     * 线程主要动作：
+     * 1.从链表队列(并发控制锁)获取拉取请求
+     * 2.根据请求拉取消息
+     *
+     */
     @Override
     public void run() {
         log.info(this.getServiceName() + " service started");

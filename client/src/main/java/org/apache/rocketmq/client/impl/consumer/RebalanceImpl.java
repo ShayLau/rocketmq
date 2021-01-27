@@ -166,10 +166,16 @@ public abstract class RebalanceImpl {
         return false;
     }
 
+    /**
+     * 加锁Broker下的 Message Queue
+     *
+     */
     public void lockAll() {
+        //key: brokerName value：消息队列集合
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
 
         Iterator<Entry<String, Set<MessageQueue>>> it = brokerMqs.entrySet().iterator();
+        //遍历每一个 broker
         while (it.hasNext()) {
             Entry<String, Set<MessageQueue>> entry = it.next();
             final String brokerName = entry.getKey();
@@ -177,9 +183,12 @@ public abstract class RebalanceImpl {
 
             if (mqs.isEmpty())
                 continue;
-
+            /**
+             * 查找 broker
+             */
             FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(brokerName, MixAll.MASTER_ID, true);
             if (findBrokerResult != null) {
+                //找到 Broker则创建批量锁请求
                 LockBatchRequestBody requestBody = new LockBatchRequestBody();
                 requestBody.setConsumerGroup(this.consumerGroup);
                 requestBody.setClientId(this.mQClientFactory.getClientId());

@@ -501,6 +501,11 @@ public class ConsumeQueue {
         }
     }
 
+    /**
+     * 过去开始下标的 buffer
+     * @param startIndex
+     * @return
+     */
     public SelectMappedBufferResult getIndexBuffer(final long startIndex) {
         int mappedFileSize = this.mappedFileSize;
         //消费队列里面的每个消息固定使用 20 个字节，所以知道开始的位置就可以根据 index*20，消费队列中的消息偏移量

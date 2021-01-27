@@ -82,11 +82,16 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         this.cleanExpireMsgExecutors = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("CleanExpireMsgScheduledThread_"));
     }
 
+    /**
+     * 并发性消费消息启动
+     */
     public void start() {
         this.cleanExpireMsgExecutors.scheduleAtFixedRate(new Runnable() {
 
+
             @Override
             public void run() {
+                //清除失效信息
                 cleanExpireMsg();
             }
 

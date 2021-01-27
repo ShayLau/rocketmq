@@ -52,6 +52,10 @@ import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 
+/**
+ * 消费消息服务实现
+ * 顺序消费
+ */
 public class ConsumeMessageOrderlyService implements ConsumeMessageService {
     private static final InternalLogger log = ClientLogger.getLog();
     private final static long MAX_TIME_CONSUME_CONTINUOUSLY =
@@ -65,6 +69,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
     private final MessageQueueLock messageQueueLock = new MessageQueueLock();
     private final ScheduledExecutorService scheduledExecutorService;
     private volatile boolean stopped = false;
+
 
     public ConsumeMessageOrderlyService(DefaultMQPushConsumerImpl defaultMQPushConsumerImpl,
         MessageListenerOrderly messageListener) {
@@ -86,6 +91,9 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumeMessageScheduledThread_"));
     }
 
+    /**
+     * 周期性锁定
+     */
     public void start() {
         if (MessageModel.CLUSTERING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -205,6 +213,10 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
         }
     }
 
+    /**
+     * 定期锁定 MQ
+     *
+     */
     public synchronized void lockMQPeriodically() {
         if (!this.stopped) {
             this.defaultMQPushConsumerImpl.getRebalanceImpl().lockAll();

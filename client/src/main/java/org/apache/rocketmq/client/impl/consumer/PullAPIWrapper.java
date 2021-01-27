@@ -140,6 +140,27 @@ public class PullAPIWrapper {
         }
     }
 
+    /**
+     * 拉请求 核心实现
+     *
+     * @param mq 消息队列
+     * @param subExpression 表达式
+     * @param expressionType 表达式类型
+     * @param subVersion
+     * @param offset 偏移量
+     * @param maxNums 最大数量
+     * @param sysFlag 系统标识
+     * @param commitOffset
+     * @param brokerSuspendMaxTimeMillis broker 延迟最大时间
+     * @param timeoutMillis 超时时间
+     * @param communicationMode 通讯模式
+     * @param pullCallback 拉请求回调
+     * @return
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     public PullResult pullKernelImpl(
         final MessageQueue mq,
         final String subExpression,
@@ -154,6 +175,10 @@ public class PullAPIWrapper {
         final CommunicationMode communicationMode,
         final PullCallback pullCallback
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+
+        /**
+         * 找到 Broker
+         */
         FindBrokerResult findBrokerResult =
             this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),
                 this.recalculatePullFromWhichNode(mq), false);
@@ -165,6 +190,8 @@ public class PullAPIWrapper {
         }
 
         if (findBrokerResult != null) {
+
+            //找到 broker 之后，检查如果版本小于 4.1，则不支持 SQL92
             {
                 // check version
                 if (!ExpressionType.isTagType(expressionType)
@@ -173,12 +200,15 @@ public class PullAPIWrapper {
                         + findBrokerResult.getBrokerVersion() + "] does not upgrade to support for filter message by " + expressionType, null);
                 }
             }
+            //系统标识
             int sysFlagInner = sysFlag;
 
+            //如果是 broker 从机，则清除 CommitOffset
             if (findBrokerResult.isSlave()) {
                 sysFlagInner = PullSysFlag.clearCommitOffsetFlag(sysFlagInner);
             }
 
+            //拉取消息请求头
             PullMessageRequestHeader requestHeader = new PullMessageRequestHeader();
             requestHeader.setConsumerGroup(this.consumerGroup);
             requestHeader.setTopic(mq.getTopic());
@@ -192,11 +222,14 @@ public class PullAPIWrapper {
             requestHeader.setSubVersion(subVersion);
             requestHeader.setExpressionType(expressionType);
 
+            /**
+             * 如果是 系统标识中有过滤标识，则调整 broker 地址
+             */
             String brokerAddr = findBrokerResult.getBrokerAddr();
             if (PullSysFlag.hasClassFilterFlag(sysFlagInner)) {
                 brokerAddr = computPullFromWhichFilterServer(mq.getTopic(), brokerAddr);
             }
-
+            //从 broker 拉请求
             PullResult pullResult = this.mQClientFactory.getMQClientAPIImpl().pullMessage(
                 brokerAddr,
                 requestHeader,

@@ -190,7 +190,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Concurrently max span offset.it has no effect on sequential consumption
-     *
+     * 同时最大跨度偏移，它对顺序消耗没有影响
      */
     private int consumeConcurrentlyMaxSpan = 2000;
 
@@ -252,6 +252,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Whether update subscription relationship when every pull
+     * 当每次拉取时是否更新订阅关系
      */
     private boolean postSubscriptionWhenPull = false;
 

@@ -74,6 +74,13 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
     }
 
+    /**
+     * 集群模式，读取偏移量
+     * 某个消息队列，读取偏移量
+     * @param mq
+     * @param type
+     * @return
+     */
     @Override
     public long readOffset(final MessageQueue mq, final ReadOffsetType type) {
         if (mq != null) {

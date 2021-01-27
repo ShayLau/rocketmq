@@ -21,6 +21,8 @@ import org.apache.rocketmq.common.message.MessageExt;
 
 /**
  * A MessageListenerOrderly object is used to receive messages orderly. One queue by one thread
+ *
+ * 一个 顺序性消息监听器 对象 被用来接收顺序消息，一个队列在一个线程
  */
 public interface MessageListenerOrderly extends MessageListener {
     /**

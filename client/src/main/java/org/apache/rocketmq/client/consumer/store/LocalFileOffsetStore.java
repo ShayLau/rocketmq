@@ -59,6 +59,11 @@ public class LocalFileOffsetStore implements OffsetStore {
             "offsets.json";
     }
 
+    /**
+     * 本地偏移量加载
+     * 从 consumer 的 store 的配置路径读取的
+     * @throws MQClientException
+     */
     @Override
     public void load() throws MQClientException {
         OffsetSerializeWrapper offsetSerializeWrapper = this.readLocalOffset();
@@ -181,6 +186,12 @@ public class LocalFileOffsetStore implements OffsetStore {
         return cloneOffsetTable;
     }
 
+    /**
+     * 读取本地偏移量
+     *
+     * @return
+     * @throws MQClientException
+     */
     private OffsetSerializeWrapper readLocalOffset() throws MQClientException {
         String content = null;
         try {
