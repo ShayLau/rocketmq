@@ -22,6 +22,7 @@ import org.apache.rocketmq.common.message.MessageExt;
 public interface TransactionListener {
     /**
      * When send transactional prepare(half) message succeed, this method will be invoked to execute local transaction.
+     * 当发送一个事务准备消息成功时，这个方法将会被在本地事务执行
      *
      * @param msg Half(prepare) message
      * @param arg Custom business parameter

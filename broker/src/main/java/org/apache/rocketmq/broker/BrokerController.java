@@ -479,6 +479,7 @@ public class BrokerController {
                     log.warn("FileWatchService created error, can't load the certificate dynamically");
                 }
             }
+            //初始化事务
             initialTransaction();
             initialAcl();
             initialRpcHooks();
@@ -486,18 +487,30 @@ public class BrokerController {
         return result;
     }
 
+    /**
+     * 初始化事务相关内容
+     *
+     * 事务消息服务
+     * 事务消息检查监听
+     * 事务消息检查服务
+     */
     private void initialTransaction() {
+        //事务消息服务
         this.transactionalMessageService = ServiceProvider.loadClass(ServiceProvider.TRANSACTION_SERVICE_ID, TransactionalMessageService.class);
         if (null == this.transactionalMessageService) {
             this.transactionalMessageService = new TransactionalMessageServiceImpl(new TransactionalMessageBridge(this, this.getMessageStore()));
             log.warn("Load default transaction message hook service: {}", TransactionalMessageServiceImpl.class.getSimpleName());
         }
+        //事务消息检查监听
         this.transactionalMessageCheckListener = ServiceProvider.loadClass(ServiceProvider.TRANSACTION_LISTENER_ID, AbstractTransactionalMessageCheckListener.class);
         if (null == this.transactionalMessageCheckListener) {
             this.transactionalMessageCheckListener = new DefaultTransactionalMessageCheckListener();
             log.warn("Load default discard message hook service: {}", DefaultTransactionalMessageCheckListener.class.getSimpleName());
         }
+        //设置事务消息检查监听的 broker
         this.transactionalMessageCheckListener.setBrokerController(this);
+
+        //事务消息检查服务
         this.transactionalMessageCheckService = new TransactionalMessageCheckService(this);
     }
 

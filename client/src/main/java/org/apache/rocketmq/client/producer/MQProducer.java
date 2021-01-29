@@ -84,6 +84,14 @@ public interface MQProducer extends MQAdmin {
     TransactionSendResult sendMessageInTransaction(final Message msg,
         final LocalTransactionExecuter tranExecuter, final Object arg) throws MQClientException;
 
+    /**
+     * 发送消息在事务中
+     *
+     * @param msg
+     * @param arg
+     * @return
+     * @throws MQClientException
+     */
     TransactionSendResult sendMessageInTransaction(final Message msg,
         final Object arg) throws MQClientException;
 

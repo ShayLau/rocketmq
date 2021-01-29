@@ -22,6 +22,9 @@ import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.protocol.NamespaceUtil;
 import org.apache.rocketmq.remoting.RPCHook;
 
+/**
+ * 事务消息生产者
+ */
 public class TransactionMQProducer extends DefaultMQProducer {
     private TransactionCheckListener transactionCheckListener;
     private int checkThreadPoolMinSize = 1;
@@ -82,6 +85,7 @@ public class TransactionMQProducer extends DefaultMQProducer {
     @Override
     public TransactionSendResult sendMessageInTransaction(final Message msg,
         final Object arg) throws MQClientException {
+        //判断事务的监听器是否为空，监听器主要用来做消息的是否发送的判断依据
         if (null == this.transactionListener) {
             throw new MQClientException("TransactionListener is null", null);
         }

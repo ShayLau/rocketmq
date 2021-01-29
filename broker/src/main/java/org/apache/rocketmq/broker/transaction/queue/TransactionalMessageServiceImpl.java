@@ -54,21 +54,38 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
 
     private static final int MAX_RETRY_COUNT_WHEN_HALF_NULL = 1;
 
+    /**
+     * 构造 事务消息服务
+     * @param transactionBridge 事务桥接类
+     */
     public TransactionalMessageServiceImpl(TransactionalMessageBridge transactionBridge) {
         this.transactionalMessageBridge = transactionBridge;
     }
 
     private ConcurrentHashMap<MessageQueue, MessageQueue> opQueueMap = new ConcurrentHashMap<>();
 
+    /**
+     * 异步准备消息
+     *
+     * @param messageInner Prepare(Half) message.
+     * @return
+     */
     @Override
     public CompletableFuture<PutMessageResult> asyncPrepareMessage(MessageExtBrokerInner messageInner) {
+        //使用事务消息桥接类放消息
         return transactionalMessageBridge.asyncPutHalfMessage(messageInner);
     }
 
+    /**
+     * 同步准备消息
+     * @param messageInner Prepare(Half) message.
+     * @return
+     */
     @Override
     public PutMessageResult prepareMessage(MessageExtBrokerInner messageInner) {
         return transactionalMessageBridge.putHalfMessage(messageInner);
     }
+
 
     private boolean needDiscard(MessageExt msgExt, int transactionCheckMax) {
         String checkTimes = msgExt.getProperty(MessageConst.PROPERTY_TRANSACTION_CHECK_TIMES);
