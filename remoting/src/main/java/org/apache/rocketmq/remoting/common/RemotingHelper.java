@@ -151,6 +151,11 @@ public class RemotingHelper {
         }
     }
 
+    /**
+     *  解析通道远程地址
+     * @param channel
+     * @return
+     */
     public static String parseChannelRemoteAddr(final Channel channel) {
         if (null == channel) {
             return "";

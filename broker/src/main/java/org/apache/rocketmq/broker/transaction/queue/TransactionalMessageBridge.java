@@ -225,10 +225,21 @@ public class TransactionalMessageBridge {
         return msgInner;
     }
 
+
+    /**
+     * 消息放入 OP 删除标志
+     *
+     * @param messageExt
+     * @param opType
+     * @return
+     */
     public boolean putOpMessage(MessageExt messageExt, String opType) {
+        //消息队列
         MessageQueue messageQueue = new MessageQueue(messageExt.getTopic(),
             this.brokerController.getBrokerConfig().getBrokerName(), messageExt.getQueueId());
+
         if (TransactionalMessageUtil.REMOVETAG.equals(opType)) {
+            //添加移除标记在事务操作
             return addRemoveTagInTransactionOp(messageExt, messageQueue);
         }
         return true;
@@ -239,6 +250,13 @@ public class TransactionalMessageBridge {
         return store.putMessage(messageInner);
     }
 
+    /**
+     * 放入消息
+     * 如果消息存储成功返回 true，否则返回 false
+     *
+     * @param messageInner
+     * @return
+     */
     public boolean putMessage(MessageExtBrokerInner messageInner) {
         PutMessageResult putMessageResult = store.putMessage(messageInner);
         if (putMessageResult != null
@@ -286,6 +304,7 @@ public class TransactionalMessageBridge {
     }
 
     private MessageExtBrokerInner makeOpMessageInner(Message message, MessageQueue messageQueue) {
+        //
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(message.getTopic());
         msgInner.setBody(message.getBody());
@@ -315,18 +334,29 @@ public class TransactionalMessageBridge {
     /**
      * Use this function while transaction msg is committed or rollback write a flag 'd' to operation queue for the
      * msg's offset
-     *
+     * 在事务消息提交或者回滚使用这个函数 ，操作队列写入一个标记 d获取队列偏移量
      * @param messageExt Op message
      * @param messageQueue Op message queue
      * @return This method will always return true.
      */
     private boolean addRemoveTagInTransactionOp(MessageExt messageExt, MessageQueue messageQueue) {
+        /**
+         * 创建一个信息新的消息 topic:RMQ_SYS_TRANS_OP_HALF_TOPIC  tags:d  messageBody: 真实消息的队列偏移量
+         */
         Message message = new Message(TransactionalMessageUtil.buildOpTopic(), TransactionalMessageUtil.REMOVETAG,
             String.valueOf(messageExt.getQueueOffset()).getBytes(TransactionalMessageUtil.charset));
+
+        //写入消息
         writeOp(message, messageQueue);
         return true;
     }
 
+    /**
+     * 写入操作
+     *
+     * @param message
+     * @param mq
+     */
     private void writeOp(Message message, MessageQueue mq) {
         MessageQueue opQueue;
         if (opQueueMap.containsKey(mq)) {
@@ -341,6 +371,10 @@ public class TransactionalMessageBridge {
         if (opQueue == null) {
             opQueue = new MessageQueue(TransactionalMessageUtil.buildOpTopic(), mq.getBrokerName(), mq.getQueueId());
         }
+
+        /**
+         * 放入消息
+         */
         putMessage(makeOpMessageInner(message, opQueue));
     }
 

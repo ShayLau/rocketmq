@@ -50,6 +50,16 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
         this.brokerController = brokerController;
     }
 
+    /**
+     * 结束事务处理
+     *
+     * 发送真实消息
+     *
+     * @param ctx
+     * @param request
+     * @return
+     * @throws RemotingCommandException
+     */
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request) throws
         RemotingCommandException {
@@ -140,17 +150,26 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
         if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == requestHeader.getCommitOrRollback()) {
             //
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
+            /**
+             * 找到消息
+             */
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
-                //检查消息
+                //检查准备消息
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
+
                 if (res.getCode() == ResponseCode.SUCCESS) {
+                    //根据发送到事务尚德准备消息，还原要发送到真实 Topic 上的消息=msgInner，并清除 TRAN_MSG 标识
                     MessageExtBrokerInner msgInner = endMessageTransaction(result.getPrepareMessage());
+
                     msgInner.setSysFlag(MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), requestHeader.getCommitOrRollback()));
                     msgInner.setQueueOffset(requestHeader.getTranStateTableOffset());
                     msgInner.setPreparedTransactionOffset(requestHeader.getCommitLogOffset());
                     msgInner.setStoreTimestamp(result.getPrepareMessage().getStoreTimestamp());
                     MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED);
+
+                    //发送消息到真实的 topic
                     RemotingCommand sendResult = sendFinalMessage(msgInner);
+                    //如果真实消息发送成功
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
@@ -159,10 +178,15 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
                 return res;
             }
         } else if (MessageSysFlag.TRANSACTION_ROLLBACK_TYPE == requestHeader.getCommitOrRollback()) {
+            //回退消息请求
             result = this.brokerController.getTransactionalMessageService().rollbackMessage(requestHeader);
+
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
+                //检查发送的准备消息
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
+                //找到发送的准备消息
                 if (res.getCode() == ResponseCode.SUCCESS) {
+                    //找到准备消息
                     this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                 }
                 return res;
@@ -182,18 +206,19 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         if (msgExt != null) {
             final String pgroupRead = msgExt.getProperty(MessageConst.PROPERTY_PRODUCER_GROUP);
+            //生产者
             if (!pgroupRead.equals(requestHeader.getProducerGroup())) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
                 response.setRemark("The producer group wrong");
                 return response;
             }
-
+            //队列偏移量
             if (msgExt.getQueueOffset() != requestHeader.getTranStateTableOffset()) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
                 response.setRemark("The transaction state table offset wrong");
                 return response;
             }
-
+            //提交日志偏移量
             if (msgExt.getCommitLogOffset() != requestHeader.getCommitLogOffset()) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
                 response.setRemark("The commit log offset wrong");
@@ -208,9 +233,16 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
         return response;
     }
 
+    /**
+     * 结束消息事务
+     * @param msgExt
+     * @return
+     */
     private MessageExtBrokerInner endMessageTransaction(MessageExt msgExt) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
+        //真实 topic
         msgInner.setTopic(msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC));
+        //真实队列 id
         msgInner.setQueueId(Integer.parseInt(msgExt.getUserProperty(MessageConst.PROPERTY_REAL_QUEUE_ID)));
         msgInner.setBody(msgExt.getBody());
         msgInner.setFlag(msgExt.getFlag());
@@ -233,9 +265,17 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
         return msgInner;
     }
 
+    /**
+     * 发送到真实的队列中的事务消息
+     *
+     * @param msgInner
+     * @return
+     */
     private RemotingCommand sendFinalMessage(MessageExtBrokerInner msgInner) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        //放入消息结果
         final PutMessageResult putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);
+
         if (putMessageResult != null) {
             switch (putMessageResult.getPutMessageStatus()) {
                 // Success
